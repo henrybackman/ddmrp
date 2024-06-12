@@ -26,12 +26,23 @@ class StockBuffer(models.Model):
     pre_daf_adu = fields.Float(readonly=True)
     daf_applied = fields.Float(default=-1, readonly=True)
     parent_daf_applied = fields.Float(default=-1, readonly=True)
+    count_ddmrp_adjustment_demand = fields.Integer(
+        compute="_compute_count_ddmrp_adjustment_demand"
+    )
+
+    def _compute_count_ddmrp_adjustment_demand(self):
+        for rec in self:
+            rec.count_ddmrp_adjustment_demand = len(
+                self.env["ddmrp.adjustment.demand"].search(
+                    [("buffer_origin_id", "=", rec.id)]
+                )
+            )
 
     @api.depends("daf_applied", "parent_daf_applied")
     def _compute_daf_text(self):
         for rec in self:
-            rec.daf_text = "DAF: *" + str(rec.daf_applied)
-            rec.parent_daf_text = "P. DAF: +" + str(rec.parent_daf_applied)
+            rec.daf_text = "DAF: *" + str(round(rec.daf_applied, 2))
+            rec.parent_daf_text = "P. DAF: +" + str(round(rec.parent_daf_applied, 2))
 
     def _daf_to_apply_domain(self, current=True):
         self.ensure_one()
@@ -49,6 +60,9 @@ class StockBuffer(models.Model):
         # Apply DAFs if existing for the buffer.
         res = super()._calc_adu()
         for rec in self:
+            self.env["ddmrp.adjustment.demand"].search(
+                [("buffer_origin_id", "=", rec.id)]
+            ).unlink()
             dafs_to_apply = self.env["ddmrp.adjustment"].search(
                 rec._daf_to_apply_domain()
             )
@@ -127,7 +141,6 @@ class StockBuffer(models.Model):
     def cron_ddmrp_adu(self, automatic=False):
         """Apply extra demand originated by Demand Adjustment Factors to
         components after the cron update of all the buffers."""
-        self.env["ddmrp.adjustment.demand"].search([]).unlink()
         super().cron_ddmrp_adu(automatic)
         today = fields.Date.today()
         for op in self.search([]).filtered("extra_demand_ids"):
@@ -176,15 +189,21 @@ class StockBuffer(models.Model):
                 )
         return res
 
+    def action_archive(self):
+        self.env["ddmrp.adjustment.demand"].search(
+            [("buffer_origin_id", "in", self.ids)]
+        ).unlink()
+        return super().action_archive()
+
     def action_view_demand_to_components(self):
         demand_ids = (
             self.env["ddmrp.adjustment.demand"]
             .search([("buffer_origin_id", "=", self.id)])
             .ids
         )
-        action = self.env["ir.actions.act_window"]._for_xml_id(
-            "ddmrp_adjustment.ddmrp_adjustment_demand_action"
-        )
+        action = self.env.ref("ddmrp_adjustment.ddmrp_adjustment_demand_action").read()[
+            0
+        ]
         action["domain"] = [("id", "in", demand_ids)]
         return action
 
@@ -201,8 +220,8 @@ class StockBuffer(models.Model):
 
     def action_view_parent_affecting_adu(self):
         demand_ids = self.extra_demand_ids.ids
-        action = self.env["ir.actions.act_window"]._for_xml_id(
-            "ddmrp_adjustment.ddmrp_adjustment_demand_action"
-        )
+        action = self.env.ref("ddmrp_adjustment.ddmrp_adjustment_demand_action").read()[
+            0
+        ]
         action["domain"] = [("id", "in", demand_ids)]
         return action
