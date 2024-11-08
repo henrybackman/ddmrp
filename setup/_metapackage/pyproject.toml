@@ -1,6 +1,6 @@
 [project]
 name = "odoo-addons-oca-ddmrp"
-version = "17.0.20240725.0"
+version = "17.0.20241108.0"
 dependencies = [
     "odoo-addon-ddmrp>=17.0dev,<17.1dev",
     "odoo-addon-ddmrp_adjustment>=17.0dev,<17.1dev",
@@ -11,6 +11,7 @@ dependencies = [
     "odoo-addon-ddmrp_history>=17.0dev,<17.1dev",
     "odoo-addon-ddmrp_report_part_flow_index>=17.0dev,<17.1dev",
     "odoo-addon-ddmrp_warning>=17.0dev,<17.1dev",
+    "odoo-addon-ddmrp_warning_as_job>=17.0dev,<17.1dev",
 ]
 classifiers=[
     "Programming Language :: Python",
